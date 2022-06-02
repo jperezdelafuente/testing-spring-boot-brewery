@@ -1,3 +1,5 @@
+[![CircleCI](https://circleci.com/gh/jperezdelafuente/testing-spring-boot-brewery/tree/master.svg?style=svg)](https://circleci.com/gh/jperezdelafuente/testing-spring-boot-brewery/tree/master)
+
 # Testing Spring Boot Brewery
 
 All source code examples in the repository are based in [Online Course - Testing Spring Beginner to Guru](https://www.udemy.com/testing-spring-boot-beginner-to-guru/?couponCode=GITHUB_REPO) from [John Thompson](https://springframework.guru/about/)
