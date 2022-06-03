@@ -29,4 +29,10 @@ public interface BeerService {
     BeerPagedList listBeers(String beerName, BeerStyleEnum beerStyle, PageRequest pageRequest);
 
     BeerDto findBeerById(UUID beerId);
+
+    BeerDto saveNewBeer(BeerDto beerDto);
+
+    void updateBeer(UUID beerId, BeerDto beerDto);
+
+    void deleteById(UUID beerId);
 }

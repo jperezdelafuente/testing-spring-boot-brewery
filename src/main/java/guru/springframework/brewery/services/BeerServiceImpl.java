@@ -23,6 +23,7 @@ import guru.springframework.brewery.web.mappers.BeerMapper;
 import guru.springframework.brewery.web.model.BeerDto;
 import guru.springframework.brewery.web.model.BeerPagedList;
 import guru.springframework.brewery.web.model.BeerStyleEnum;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -32,6 +33,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class BeerServiceImpl implements BeerService {
 
@@ -84,5 +86,22 @@ public class BeerServiceImpl implements BeerService {
             //todo add error handling
             throw new RuntimeException("Not Found");
         }
+    }
+
+    @Override
+    public BeerDto saveNewBeer(BeerDto beerDto) {
+        return BeerDto.builder()
+                .id(UUID.randomUUID())
+                .build();
+    }
+
+    @Override
+    public void updateBeer(UUID beerId, BeerDto beerDto) {
+        //todo impl - would add a real impl to update beer
+    }
+
+    @Override
+    public void deleteById(UUID beerId) {
+        log.debug("Deleting a beer...");
     }
 }
