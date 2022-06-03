@@ -1,35 +1,41 @@
 package guru.springframework.brewery.web.controllers;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import guru.springframework.brewery.services.BeerService;
 import guru.springframework.brewery.web.model.BeerDto;
-import guru.springframework.brewery.web.model.BeerPagedList;
 import guru.springframework.brewery.web.model.BeerStyleEnum;
 import org.junit.jupiter.api.*;
-import org.mockito.ArgumentCaptor;
-import org.mockito.Captor;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.restdocs.AutoConfigureRestDocs;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
+import org.springframework.restdocs.RestDocumentationExtension;
+import org.springframework.restdocs.constraints.ConstraintDescriptions;
+import org.springframework.restdocs.payload.FieldDescriptor;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
-import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.core.Is.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.reset;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.restdocs.mockmvc.MockMvcRestDocumentation.document;
+import static org.springframework.restdocs.mockmvc.RestDocumentationRequestBuilders.*;
+import static org.springframework.restdocs.payload.PayloadDocumentation.*;
+import static org.springframework.restdocs.request.RequestDocumentation.parameterWithName;
+import static org.springframework.restdocs.request.RequestDocumentation.pathParameters;
+import static org.springframework.restdocs.snippet.Attributes.key;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+@ExtendWith(RestDocumentationExtension.class)
+@AutoConfigureRestDocs
 @WebMvcTest(BeerController.class)
 class BeerControllerTest {
 
@@ -40,6 +46,9 @@ class BeerControllerTest {
     MockMvc mockMvc;
 
     BeerDto validBeer;
+
+    @Autowired
+    ObjectMapper objectMapper;
 
     @BeforeEach
     void setUp() {
@@ -61,67 +70,89 @@ class BeerControllerTest {
     }
 
     @Test
-    void testGetBeerById() throws Exception {
-        given(beerService.findBeerById(any())).willReturn(validBeer);
-        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssZ");
+    public void getBeer() throws Exception {
+        given(beerService.findBeerById(any(UUID.class))).willReturn(validBeer);
 
-        MvcResult result= mockMvc.perform(get("/api/v1/beer/" + validBeer.getId()))
+        ConstrainedFields fields = new ConstrainedFields(BeerDto.class);
+
+        mockMvc.perform(get("/api/v1/beer/{beerId}", validBeer.getId().toString()).accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8))
                 .andExpect(jsonPath("$.id", is(validBeer.getId().toString())))
                 .andExpect(jsonPath("$.beerName", is("Beer1")))
-                .andExpect(jsonPath("$.createdDate", is(dateTimeFormatter.format(validBeer.getCreatedDate()))))
-                .andExpect(jsonPath("$.lastModifiedDate", is(dateTimeFormatter.format(validBeer.getLastModifiedDate()))))
-                .andReturn();
-
-        System.out.println(result.getResponse().getContentAsString());
+                .andDo(document("v1/beer-get",
+                        pathParameters (
+                                parameterWithName("beerId").description("UUID of desired beer to get.")
+                        ),
+                        responseFields(
+                                fields.withPath("id").description("Id of Beer").type(UUID.class),
+                                fields.withPath("createdDate").description("Date Created").type(OffsetDateTime.class),
+                                fields.withPath("lastModifiedDate").description("Date Updated").type(OffsetDateTime.class),
+                                fields.withPath("beerName").description("Beer Name"),
+                                fields.withPath("beerStyle").description("Beer Style"),
+                                fields.withPath("upc").description("UPC of Beer"),
+                                fields.withPath("quantityOnHand").description("Quantity on hand"),
+                                fields.withPath("price").description("Price"),
+                                fields.withPath("version").description("Version")
+                        )));
     }
 
-    @DisplayName("List Ops - ")
-    @Nested
-    public class TestListOperations {
+    @Test
+    public void handlePost() throws Exception {
+        //given
+        BeerDto beerDto = validBeer;
+        beerDto.setId(null);
+        BeerDto savedDto = BeerDto.builder().id(UUID.randomUUID()).beerName("New Beer").build();
+        String beerDtoJson = objectMapper.writeValueAsString(beerDto);
 
-        @Captor
-        ArgumentCaptor<String> beerNameCaptor;
+        given(beerService.saveNewBeer(any())).willReturn(savedDto);
 
-        @Captor
-        ArgumentCaptor<BeerStyleEnum> beerStyleEnumCaptor;
+        ConstrainedFields fields = new ConstrainedFields(BeerDto.class);
 
-        @Captor
-        ArgumentCaptor<PageRequest> pageRequestCaptor;
+        mockMvc.perform(post("/api/v1/beer/")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(beerDtoJson))
+                .andExpect(status().isCreated())
+                .andDo(document("v1/beer-new",
+                        requestFields(
+                                fields.withPath("id").description("Id of Beer").ignored(),
+                                fields.withPath("createdDate").description("Date Created").ignored(),
+                                fields.withPath("lastModifiedDate").description("Date Updated").ignored(),
+                                fields.withPath("beerName").description("Beer Name"),
+                                fields.withPath("beerStyle").description("Beer Style"),
+                                fields.withPath("upc").description("UPC of Beer"),
+                                fields.withPath("quantityOnHand").description("Quantity on hand"),
+                                fields.withPath("price").description("Price"),
+                                fields.withPath("version").description("Version")
+                        )));
 
-        BeerPagedList beerPagedList;
+    }
 
-        @BeforeEach
-        void setUp() {
-            List<BeerDto> beers = new ArrayList<>();
-            beers.add(validBeer);
-            beers.add(BeerDto.builder().id(UUID.randomUUID())
-                    .version(1)
-                    .beerName("Beer4")
-                    .upc(123123123122L)
-                    .beerStyle(BeerStyleEnum.PALE_ALE)
-                    .price(new BigDecimal("12.99"))
-                    .quantityOnHand(66)
-                    .createdDate(OffsetDateTime.now())
-                    .lastModifiedDate(OffsetDateTime.now())
-                    .build());
+    @Test
+    public void handleUpdate() throws Exception {
+        //given
+        BeerDto beerDto = validBeer;
+        beerDto.setId(null);
+        String beerDtoJson = objectMapper.writeValueAsString(beerDto);
+        //when
+        mockMvc.perform(put("/api/v1/beer/" + UUID.randomUUID())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(beerDtoJson))
+                .andExpect(status().isNoContent());
+        then(beerService).should().updateBeer(any(), any());
+    }
 
-            beerPagedList = new BeerPagedList(beers, PageRequest.of(1, 1), 2L);
+    private static class ConstrainedFields {
+        private final ConstraintDescriptions constraintDescriptions;
 
-            given(beerService.listBeers(beerNameCaptor.capture(), beerStyleEnumCaptor.capture(),
-                    pageRequestCaptor.capture())).willReturn(beerPagedList);
+        ConstrainedFields(Class<?> input) {
+            this.constraintDescriptions = new ConstraintDescriptions(input);
         }
 
-        @DisplayName("Test list beers - no parameters")
-        @Test
-        void testListBeers() throws Exception {
-            mockMvc.perform(get("/api/v1/beer")
-                            .accept(MediaType.APPLICATION_JSON))
-                    .andExpect(status().isOk())
-                    .andExpect(content().contentType(MediaType.APPLICATION_JSON_UTF8))
-                    .andExpect(jsonPath("$.content", hasSize(2)))
-                    .andExpect(jsonPath("$.content[0].id", is(validBeer.getId().toString())));
+        private FieldDescriptor withPath(String path) {
+            return fieldWithPath(path).attributes(key("constraints").value(StringUtils
+                    .collectionToDelimitedString(this.constraintDescriptions
+                            .descriptionsForProperty(path), ". ")));
         }
     }
 }
